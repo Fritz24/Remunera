@@ -5,3 +5,6 @@ export function formatRelativeTime(dateString: string): string {
   return formatDistanceToNowStrict(date, { addSuffix: true })
 }
 
+export function formatCfa(amount: number): string {
+  return new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XOF' }).format(amount);
+}

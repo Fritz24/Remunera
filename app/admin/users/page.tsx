@@ -3,7 +3,7 @@ import { UsersTable } from "@/components/admin/users-table"
 
 export default function AdminUsersPage() {
   return (
-    <DashboardLayout role="admin" userName="Admin User">
+    <DashboardLayout role="admin" userName="Admin">
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Users</h2>

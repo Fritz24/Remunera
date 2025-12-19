@@ -1,20 +1,58 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
+  const { searchParams } = new URL(request.url)
+  const month = searchParams.get("month")
+  const year = searchParams.get("year")
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("payroll_run")
-    .select("*")
+    .select(
+      `
+      id,
+      month,
+      year,
+      status,
+      total_gross,
+      total_deductions,
+      total_net,
+      processed_at,
+      payslip(status)
+      `
+    )
+
+  if (month && month !== "all") {
+    query = query.eq("month", parseInt(month))
+  }
+  if (year && year !== "all") {
+    query = query.eq("year", parseInt(year))
+  }
+
+  const { data: payrollRuns, error } = await query
     .order("year", { ascending: false })
     .order("month", { ascending: false })
 
   if (error) {
+    console.error("Error fetching payroll runs:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  const formattedPayrollRuns = await Promise.all(payrollRuns.map(async (run) => {
+    const allPayslipsPaidOrApproved = run.payslip.every((p: any) => p.status === "paid" || p.status === "approved")
+    const overallStatus = allPayslipsPaidOrApproved ? "complete" : "incomplete"
+
+    // To avoid circular structure issues for NextResponse.json, explicitly create a new object
+    const { payslip, ...rest } = run
+
+    return {
+      ...rest,
+      status: overallStatus,
+    }
+  }))
+
+  return NextResponse.json(formattedPayrollRuns)
 }
 
 export async function POST(request: Request) {

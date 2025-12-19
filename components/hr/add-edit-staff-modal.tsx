@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import {
   Dialog,
   DialogContent,
@@ -28,15 +29,21 @@ export function AddEditStaffModal({ isOpen, onClose, staff }: AddEditStaffModalP
     firstName: "",
     lastName: "",
     email: "",
+    password: "",
     phone: "",
-    department: "",
     position: "",
     employmentType: "full-time",
-    staffType: "",
+    selectedDeduction: "", // New field for selected deduction
     hireDate: "",
     salary: "",
+    payPerHour: "",
     status: "active",
   })
+
+  const fetcher = (url: string) => fetch(url).then((res) => res.json())
+
+  const { data: positions, error: positionsError } = useSWR("/api/hr/positions", fetcher)
+  const { data: deductions, error: deductionsError } = useSWR("/api/payroll/deductions", fetcher)
 
   useEffect(() => {
     if (staff) {
@@ -45,36 +52,110 @@ export function AddEditStaffModal({ isOpen, onClose, staff }: AddEditStaffModalP
         firstName,
         lastName: lastNameParts.join(" "),
         email: staff.email,
-        phone: "",
-        department: staff.department,
-        position: staff.position,
-        employmentType: staff.employmentType,
-        staffType: staff.staffType,
-        hireDate: "",
-        salary: "",
-        status: staff.status,
+        password: "", // Password should not be pre-filled
+        phone: staff.phone || "",
+        position: staff.position_id || "",
+        employmentType: staff.employment_status || "full-time",
+        selectedDeduction: staff.staff_deduction?.[0]?.deduction_id || "", // Initialize with existing deduction
+        hireDate: staff.hire_date || "",
+        salary: staff.salary_structure?.basic_salary?.toString() || "",
+        payPerHour: staff.hourly_rate?.toString() || "",
+        status: staff.employment_status || "active",
       })
     } else {
       setFormData({
         firstName: "",
         lastName: "",
         email: "",
+        password: "",
         phone: "",
-        department: "",
         position: "",
         employmentType: "full-time",
-        staffType: "",
+        selectedDeduction: "",
         hireDate: "",
         salary: "",
+        payPerHour: "",
         status: "active",
       })
     }
   }, [staff])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Staff data:", formData)
-    onClose()
+
+    try {
+      let userId = staff?.user_id
+
+      if (!staff) {
+        // Create auth user first if adding new staff
+        const userAuthResponse = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            full_name: `${formData.firstName} ${formData.lastName}`,
+            role: "staff", // All staff members have the 'staff' role
+          }),
+        })
+
+        if (!userAuthResponse.ok) {
+          const errorData = await userAuthResponse.json()
+          throw new Error(errorData.error || "Failed to create user account")
+        }
+
+        const userData = await userAuthResponse.json()
+        userId = userData.id
+      }
+
+      const method = staff ? "PUT" : "POST"
+      const url = "/api/hr/staff"
+      const payload: any = {
+        user_id: userId,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        position_id: formData.position,
+        employment_status: formData.employmentType,
+        hire_date: formData.hireDate,
+        status: formData.status,
+      }
+
+    if (formData.employmentType === "full-time") {
+      payload.salary = parseFloat(formData.salary)
+    } else if (formData.employmentType === "part-time") {
+      payload.pay_per_hour = parseFloat(formData.payPerHour)
+    }
+
+      // Add deduction only if selected and not "None"
+      if (formData.selectedDeduction && formData.selectedDeduction !== "no-deduction") {
+        payload.deduction_id = formData.selectedDeduction
+      }
+
+      if (staff) {
+        payload.id = staff.id
+      }
+
+      const staffResponse = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!staffResponse.ok) {
+        const errorData = await staffResponse.json()
+        throw new Error(errorData.error || "Failed to save staff profile")
+      }
+
+      onClose()
+      // Optionally show a toast notification for success
+      // toast.success(staff ? "Staff updated successfully!" : "Staff created successfully!")
+
+    } catch (error) {
+      console.error("Error saving staff:", error)
+      alert("Failed to save staff: " + (error as Error).message)
+    }
   }
 
   return (
@@ -127,6 +208,19 @@ export function AddEditStaffModal({ isOpen, onClose, staff }: AddEditStaffModalP
                 />
               </div>
 
+              {!staff && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
                 <Input
@@ -140,106 +234,178 @@ export function AddEditStaffModal({ isOpen, onClose, staff }: AddEditStaffModalP
 
             <TabsContent value="employment" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="employmentType">Employment Type</Label>
                 <Select
-                  value={formData.department}
-                  onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  value={formData.employmentType}
+                  onValueChange={(value) => setFormData({ ...formData, employmentType: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Computer Science">Computer Science</SelectItem>
-                    <SelectItem value="Mathematics">Mathematics</SelectItem>
-                    <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="Business">Business</SelectItem>
-                    <SelectItem value="Human Resources">Human Resources</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="position">Position</Label>
-                <Input
-                  id="position"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="employmentType">Employment Type</Label>
-                  <Select
-                    value={formData.employmentType}
-                    onValueChange={(value) => setFormData({ ...formData, employmentType: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full-time">Full-Time</SelectItem>
-                      <SelectItem value="part-time">Part-Time</SelectItem>
-                      <SelectItem value="contract">Contract</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="staffType">Staff Type</Label>
-                  <Select
-                    value={formData.staffType}
-                    onValueChange={(value) => setFormData({ ...formData, staffType: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select staff type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Academic Staff">Academic Staff</SelectItem>
-                      <SelectItem value="Administrative Staff">Administrative Staff</SelectItem>
-                      <SelectItem value="Technical Staff">Technical Staff</SelectItem>
-                      <SelectItem value="Support Staff">Support Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="hireDate">Hire Date</Label>
-                  <Input
-                    id="hireDate"
-                    type="date"
-                    value={formData.hireDate}
-                    onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="salary">Basic Salary</Label>
-                  <Input
-                    id="salary"
-                    type="number"
-                    value={formData.salary}
-                    onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="full-time">Full-Time</SelectItem>
+                    <SelectItem value="part-time">Part-Time</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {formData.employmentType === "full-time" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Position</Label>
+                    <Select
+                      value={formData.position}
+                      onValueChange={(value) => setFormData({ ...formData, position: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions?.map((position: any) => (
+                          <SelectItem key={position.id} value={position.id}>
+                            {position.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hireDate">Hire Date</Label>
+                      <Input
+                        id="hireDate"
+                        type="date"
+                        value={formData.hireDate}
+                        onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="salary">Basic Salary</Label>
+                      <Input
+                        id="salary"
+                        type="number"
+                        value={formData.salary}
+                        onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="deduction">Deduction</Label>
+                    <Select
+                      value={formData.selectedDeduction}
+                      onValueChange={(value) => setFormData({ ...formData, selectedDeduction: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select deduction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="no-deduction">None</SelectItem>
+                        {deductions?.map((deduction: any) => (
+                          <SelectItem key={deduction.id} value={deduction.id}>
+                            {deduction.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+
+              {formData.employmentType === "part-time" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Position</Label>
+                    <Select
+                      value={formData.position}
+                      onValueChange={(value) => setFormData({ ...formData, position: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions?.map((position: any) => (
+                          <SelectItem key={position.id} value={position.id}>
+                            {position.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="payPerHour">Pay Per Hour</Label>
+                      <Input
+                        id="payPerHour"
+                        type="number"
+                        value={formData.payPerHour}
+                        onChange={(e) => setFormData({ ...formData, payPerHour: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="hireDate">Hire Date</Label>
+                      <Input
+                        id="hireDate"
+                        type="date"
+                        value={formData.hireDate}
+                        onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="deduction">Deduction</Label>
+                    <Select
+                      value={formData.selectedDeduction}
+                      onValueChange={(value) => setFormData({ ...formData, selectedDeduction: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select deduction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="no-deduction">None</SelectItem>
+                        {deductions?.map((deduction: any) => (
+                          <SelectItem key={deduction.id} value={deduction.id}>
+                            {deduction.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </TabsContent>
           </Tabs>
 

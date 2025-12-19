@@ -22,8 +22,7 @@ export async function POST(request: Request) {
     .insert({
       name: body.name,
       description: body.description,
-      amount_type: body.amount_type,
-      default_amount: body.default_amount,
+      amount: body.amount,
       is_mandatory: body.is_mandatory,
     })
     .select()
@@ -45,8 +44,7 @@ export async function PUT(request: Request) {
     .update({
       name: body.name,
       description: body.description,
-      amount_type: body.amount_type,
-      default_amount: body.default_amount,
+      amount: body.amount,
       is_mandatory: body.is_mandatory,
     })
     .eq("id", body.id)

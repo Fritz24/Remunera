@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import {
   Dialog,
   DialogContent,
@@ -26,22 +27,62 @@ interface AddEditPositionModalProps {
 export function AddEditPositionModal({ isOpen, onClose, position }: AddEditPositionModalProps) {
   const [formData, setFormData] = useState({
     title: "",
-    department: "",
     description: "",
+    selectedAllowance: "", // New field for selected allowance
   })
+
+  const fetcher = (url: string) => fetch(url).then((res) => res.json())
+  const { data: allowances, error: allowancesError } = useSWR("/api/payroll/allowances", fetcher)
 
   useEffect(() => {
     if (position) {
-      setFormData(position)
+      setFormData({
+        title: position.title,
+        description: position.description || "",
+        selectedAllowance: position.position_allowance?.[0]?.allowance?.id || "no-allowance", // Initialize with existing allowance or 'no-allowance'
+      })
     } else {
-      setFormData({ title: "", department: "", description: "" })
+      setFormData({ title: "", description: "", selectedAllowance: "no-allowance" })
     }
   }, [position])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Position data:", formData)
-    onClose()
+
+    const method = position ? "PUT" : "POST"
+    const url = "/api/hr/positions"
+    const payload: any = {
+      title: formData.title,
+      description: formData.description,
+    }
+
+    if (formData.selectedAllowance && formData.selectedAllowance !== "no-allowance") {
+      payload.allowance_id = formData.selectedAllowance
+    }
+
+    if (position) {
+      payload.id = position.id
+    }
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save position")
+      }
+
+      onClose()
+      // Optionally show a toast notification for success
+      // toast.success(position ? "Position updated successfully!" : "Position created successfully!")
+    } catch (error) {
+      console.error("Error saving position:", error)
+      alert("Failed to save position: " + (error as Error).message)
+    }
   }
 
   return (
@@ -67,20 +108,21 @@ export function AddEditPositionModal({ isOpen, onClose, position }: AddEditPosit
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
+            <Label htmlFor="allowances">Allowance</Label>
             <Select
-              value={formData.department}
-              onValueChange={(value) => setFormData({ ...formData, department: value })}
+              value={formData.selectedAllowance}
+              onValueChange={(value) => setFormData({ ...formData, selectedAllowance: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder="Select allowance" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Computer Science">Computer Science</SelectItem>
-                <SelectItem value="Mathematics">Mathematics</SelectItem>
-                <SelectItem value="Engineering">Engineering</SelectItem>
-                <SelectItem value="Business">Business</SelectItem>
-                <SelectItem value="Human Resources">Human Resources</SelectItem>
+                <SelectItem value="no-allowance">None</SelectItem>
+                {allowances?.map((allowance: any) => (
+                  <SelectItem key={allowance.id} value={allowance.id}>
+                    {allowance.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

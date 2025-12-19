@@ -9,6 +9,7 @@ import { Plus, Search, Pencil, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { AddEditStaffModal } from "./add-edit-staff-modal"
 import useSWR from "swr"
+import { toast } from "sonner"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -17,7 +18,19 @@ export function StaffManagementTable() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<any>(null)
 
-  const { data: staffList = [], error, mutate } = useSWR("/api/hr/staff", fetcher)
+  const { data: staffList = [], error, mutate } = useSWR(
+    "/api/hr/staff",
+    (url) =>
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) =>
+          data.map((staff: any) => ({
+            ...staff,
+            basic_salary: staff.salary_structure?.[0]?.basic_salary,
+            deduction_name: staff.staff_deduction?.[0]?.deduction?.name,
+          })),
+        ),
+  )
 
   const handleAddStaff = () => {
     setSelectedStaff(null)
@@ -36,6 +49,7 @@ export function StaffManagementTable() {
       const response = await fetch(`/api/hr/staff?id=${id}`, { method: "DELETE" })
       if (response.ok) {
         mutate()
+        toast.success("Staff member deleted successfully!")
       }
     } catch (error) {
       console.error("Failed to delete staff:", error)
@@ -48,6 +62,9 @@ export function StaffManagementTable() {
       inactive: "bg-gray-100 text-gray-800",
       terminated: "bg-red-100 text-red-800",
       on_leave: "bg-blue-100 text-blue-800",
+      // Add colors for full-time and part-time if needed
+      "full-time": "bg-purple-100 text-purple-800",
+      "part-time": "bg-yellow-100 text-yellow-800",
     }
     return colors[status] || colors.active
   }
@@ -56,8 +73,9 @@ export function StaffManagementTable() {
     (staff: any) =>
       staff.first_name?.toLowerCase().includes(search.toLowerCase()) ||
       staff.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+      staff.employment_status?.toLowerCase().includes(search.toLowerCase()) ||
       staff.email?.toLowerCase().includes(search.toLowerCase()) ||
-      staff.department?.name?.toLowerCase().includes(search.toLowerCase()),
+      staff.phone?.toLowerCase().includes(search.toLowerCase()),
   )
 
   if (error) return <div>Failed to load staff</div>
@@ -79,7 +97,7 @@ export function StaffManagementTable() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search staff by name, email, or department..."
+                placeholder="Search staff by name, employment type, email, or phone..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10"
@@ -92,9 +110,11 @@ export function StaffManagementTable() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Department</TableHead>
                   <TableHead>Position</TableHead>
-                  <TableHead>Staff Type</TableHead>
+                  <TableHead>Employment Type</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Hire Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -107,15 +127,20 @@ export function StaffManagementTable() {
                         <p className="font-medium">
                           {staff.first_name} {staff.last_name}
                         </p>
-                        <p className="text-xs text-muted-foreground">{staff.email}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{staff.department?.name || "N/A"}</TableCell>
                     <TableCell>{staff.position?.title || "N/A"}</TableCell>
-                    <TableCell>{staff.staff_type?.name || "N/A"}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={getEmploymentTypeBadge(staff.employment_status)}>
                         {staff.employment_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{staff.email}</TableCell>
+                    <TableCell>{staff.phone || "N/A"}</TableCell>
+                    <TableCell>{staff.hire_date || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={getEmploymentTypeBadge(staff.status)}>
+                        {staff.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

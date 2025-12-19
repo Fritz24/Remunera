@@ -26,7 +26,6 @@ interface AddEditDeductionModalProps {
 export function AddEditDeductionModal({ isOpen, onClose, deduction }: AddEditDeductionModalProps) {
   const [formData, setFormData] = useState({
     name: "",
-    type: "fixed",
     amount: "",
     description: "",
   })
@@ -34,18 +33,49 @@ export function AddEditDeductionModal({ isOpen, onClose, deduction }: AddEditDed
   useEffect(() => {
     if (deduction) {
       setFormData({
-        ...deduction,
+        name: deduction.name,
         amount: deduction.amount.toString(),
+        description: deduction.description || "",
       })
     } else {
-      setFormData({ name: "", type: "fixed", amount: "", description: "" })
+      setFormData({ name: "", amount: "", description: "" })
     }
   }, [deduction])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Deduction data:", formData)
-    onClose()
+
+    const method = deduction ? "PUT" : "POST"
+    const url = "/api/payroll/deductions"
+    const payload = {
+      name: formData.name,
+      amount: parseFloat(formData.amount),
+      description: formData.description,
+    }
+
+    if (deduction) {
+      // @ts-ignore
+      payload.id = deduction.id
+    }
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save deduction")
+      }
+
+      onClose()
+      // toast.success(deduction ? "Deduction updated successfully!" : "Deduction created successfully!")
+    } catch (error) {
+      console.error("Error saving deduction:", error)
+      alert("Failed to save deduction: " + (error as Error).message)
+    }
   }
 
   return (
@@ -71,27 +101,14 @@ export function AddEditDeductionModal({ isOpen, onClose, deduction }: AddEditDed
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
-            <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fixed">Fixed Amount</SelectItem>
-                <SelectItem value="percentage">Percentage</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="amount">{formData.type === "percentage" ? "Percentage (%)" : "Amount ($)"}</Label>
+            <Label htmlFor="amount">Amount ($)</Label>
             <Input
               id="amount"
               type="number"
               step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              placeholder={formData.type === "percentage" ? "15" : "150"}
+              placeholder="150"
               required
             />
           </div>

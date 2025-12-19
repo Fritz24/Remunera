@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { AddEditAllowanceModal } from "./add-edit-allowance-modal"
 import useSWR from "swr"
+import { toast } from "sonner"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -24,6 +25,7 @@ export function AllowancesTable() {
       const response = await fetch(`/api/payroll/allowances?id=${id}`, { method: "DELETE" })
       if (response.ok) {
         mutate()
+        toast.success("Allowance deleted successfully!")
       }
     } catch (error) {
       console.error("Failed to delete allowance:", error)
@@ -55,7 +57,6 @@ export function AllowancesTable() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -65,22 +66,8 @@ export function AllowancesTable() {
                 {allowances.map((allowance: any) => (
                   <TableRow key={allowance.id}>
                     <TableCell className="font-medium">{allowance.name}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={
-                          allowance.amount_type === "fixed"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800"
-                        }
-                      >
-                        {allowance.amount_type}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="font-mono">
-                      {allowance.amount_type === "percentage"
-                        ? `${allowance.default_amount}%`
-                        : `$${Number(allowance.default_amount).toLocaleString()}`}
+                      {`$${Number(allowance.amount).toLocaleString()}`}
                     </TableCell>
                     <TableCell>{allowance.description}</TableCell>
                     <TableCell className="text-right">

@@ -22,9 +22,7 @@ export async function POST(request: Request) {
     .insert({
       name: body.name,
       description: body.description,
-      amount_type: body.amount_type,
-      default_amount: body.default_amount,
-      is_taxable: body.is_taxable,
+      amount: body.amount,
     })
     .select()
     .single()
@@ -45,9 +43,7 @@ export async function PUT(request: Request) {
     .update({
       name: body.name,
       description: body.description,
-      amount_type: body.amount_type,
-      default_amount: body.default_amount,
-      is_taxable: body.is_taxable,
+      amount: body.amount,
     })
     .eq("id", body.id)
     .select()

@@ -7,17 +7,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { AddEditDeductionModal } from "./add-edit-deduction-modal"
+import useSWR from "swr"
+import { toast } from "sonner"
 
-const mockDeductions = [
-  { id: "1", name: "Income Tax", type: "percentage", amount: 15, description: "Federal income tax" },
-  { id: "2", name: "Social Security", type: "percentage", amount: 6.2, description: "Social security contribution" },
-  { id: "3", name: "Medicare", type: "percentage", amount: 1.45, description: "Medicare contribution" },
-  { id: "4", name: "Health Insurance", type: "fixed", amount: 150, description: "Monthly health insurance premium" },
-]
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export function DeductionsTable() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDeduction, setSelectedDeduction] = useState<any>(null)
+
+  const { data: deductions = [], error, mutate } = useSWR("/api/payroll/deductions", fetcher)
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this deduction?")) return
+
+    try {
+      const response = await fetch(`/api/payroll/deductions?id=${id}`, { method: "DELETE" })
+      if (response.ok) {
+        mutate()
+        toast.success("Deduction deleted successfully!")
+      }
+    } catch (error) {
+      console.error("Failed to delete deduction:", error)
+    }
+  }
+
+  if (error) return <div>Failed to load deductions</div>
 
   return (
     <>
@@ -42,28 +57,17 @@ export function DeductionsTable() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockDeductions.map((deduction) => (
+                {deductions.map((deduction: any) => (
                   <TableRow key={deduction.id}>
                     <TableCell className="font-medium">{deduction.name}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={
-                          deduction.type === "fixed" ? "bg-blue-100 text-blue-800" : "bg-orange-100 text-orange-800"
-                        }
-                      >
-                        {deduction.type}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="font-mono">
-                      {deduction.type === "percentage" ? `${deduction.amount}%` : `$${deduction.amount}`}
+                      {`$${Number(deduction.amount).toLocaleString()}`}
                     </TableCell>
                     <TableCell>{deduction.description}</TableCell>
                     <TableCell className="text-right">
@@ -78,7 +82,7 @@ export function DeductionsTable() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(deduction.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -91,7 +95,14 @@ export function DeductionsTable() {
         </CardContent>
       </Card>
 
-      <AddEditDeductionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} deduction={selectedDeduction} />
+      <AddEditDeductionModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          mutate()
+        }}
+        deduction={selectedDeduction}
+      />
     </>
   )
 }

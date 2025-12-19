@@ -6,48 +6,122 @@ import { Button } from "@/components/ui/button"
 import { Download, Eye, ChevronUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import useSWR from "swr"
+import { createClient } from "@/lib/supabase/client"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { format } from "date-fns"
+import { formatCfa } from "@/lib/utils/formatters"
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+interface Payslip {
+  id: string
+  month: number
+  year: number
+  basic_salary: number
+  total_allowances: number
+  total_deductions: number
+  gross_pay: number
+  net_pay: number
+  status: string
+  payment_date: string | null
+  staff: { first_name: string; last_name: string; position: { title: string } }
+}
+
+const fetcher = async ([url, month, year]: [string, string, string]) => {
+  const response = await fetch(`${url}?month=${month}&year=${year}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch payslips");
+  }
+  return response.json();
+};
 
 export function StaffPayslips() {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const currentYear = new Date().getFullYear();
+  const [selectedMonth, setSelectedMonth] = useState<string>((new Date().getMonth() + 1).toString());
+  const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
 
-  const { data: payslips = [], error } = useSWR("/api/staff/payslips", fetcher)
+  const { data: payslips, error, isLoading } = useSWR<Payslip[]>(
+    [`/api/staff/payslips`, selectedMonth, selectedYear],
+    fetcher
+  );
+
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    value: (i + 1).toString(),
+    label: new Date(0, i).toLocaleString("en-US", { month: "long" }),
+  }));
+  months.unshift({ value: "all", label: "All Months" });
+
+  const years = Array.from({ length: 5 }, (_, i) => ({
+    value: (currentYear - i).toString(),
+    label: (currentYear - i).toString(),
+  }));
+  years.unshift({ value: "all", label: "All Years" });
 
   const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id)
-  }
+    setExpandedId(expandedId === id ? null : id);
+  };
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       paid: "bg-green-100 text-green-800",
-      pending: "bg-blue-100 text-blue-800",
+      pending: "bg-yellow-100 text-yellow-800",
+      approved: "bg-blue-100 text-blue-800",
       cancelled: "bg-gray-100 text-gray-800",
-    }
-    return colors[status] || colors.pending
-  }
+    };
+    return colors[status] || colors.pending;
+  };
 
-  const getMonthName = (month: number) => {
-    return new Date(0, month - 1).toLocaleString("default", { month: "long" })
-  }
+  const handleDownloadPayslip = (payslipId: string) => {
+    console.log("Download payslip:", payslipId);
+    // Implement actual download logic, e.g., fetch from a backend endpoint
+    // For now, it's a placeholder.
+  };
 
-  if (error) return <div>Failed to load payslips</div>
-  if (!payslips.length)
+  if (error) return <div className="text-center text-destructive">Failed to load payslips</div>;
+  if (isLoading) return <div className="text-center text-muted-foreground">Loading payslips...</div>;
+  if (!payslips || payslips.length === 0) {
     return (
       <Card>
-        <CardContent className="p-6 text-center text-muted-foreground">No payslips available yet</CardContent>
+        <CardContent className="p-6 text-center text-muted-foreground">No payslips available yet for the selected period.</CardContent>
       </Card>
-    )
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {payslips.map((payslip: any) => (
+      <div className="flex items-center gap-4 mb-4 flex-wrap">
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select Month" />
+          </SelectTrigger>
+          <SelectContent>
+            {months.map((month) => (
+              <SelectItem key={month.value} value={month.value}>
+                {month.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedYear} onValueChange={setSelectedYear}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select Year" />
+          </SelectTrigger>
+          <SelectContent>
+            {years.map((year) => (
+              <SelectItem key={year.value} value={year.value}>
+                {year.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {payslips.map((payslip: Payslip) => (
         <Card key={payslip.id}>
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
                 <CardTitle>
-                  {getMonthName(payslip.month)} {payslip.year}
+                  {format(new Date(payslip.year, payslip.month - 1), "MMMM yyyy")}
                 </CardTitle>
                 <Badge variant="secondary" className={getStatusBadge(payslip.status)}>
                   {payslip.status}
@@ -67,7 +141,7 @@ export function StaffPayslips() {
                     </>
                   )}
                 </Button>
-                <Button size="sm">
+                <Button size="sm" onClick={() => handleDownloadPayslip(payslip.id)}>
                   <Download className="mr-2 h-4 w-4" />
                   Download
                 </Button>
@@ -83,17 +157,17 @@ export function StaffPayslips() {
                   <div className="space-y-2 rounded-lg bg-muted/50 p-3">
                     <div className="flex justify-between text-sm">
                       <span>Basic Salary</span>
-                      <span className="font-mono">${Number(payslip.basic_salary).toLocaleString()}</span>
+                      <span className="font-mono">{formatCfa(payslip.basic_salary)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Total Allowances</span>
                       <span className="font-mono text-green-600">
-                        +${Number(payslip.total_allowances).toLocaleString()}
+                        +{formatCfa(payslip.total_allowances)}
                       </span>
                     </div>
                     <div className="flex justify-between border-t pt-2 font-semibold">
                       <span>Gross Pay</span>
-                      <span className="font-mono">${Number(payslip.gross_pay).toLocaleString()}</span>
+                      <span className="font-mono">{formatCfa(payslip.gross_pay)}</span>
                     </div>
                   </div>
                 </div>
@@ -104,7 +178,7 @@ export function StaffPayslips() {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Total Deductions</span>
                       <span className="font-mono text-red-600">
-                        -${Number(payslip.total_deductions).toLocaleString()}
+                        -{formatCfa(payslip.total_deductions)}
                       </span>
                     </div>
                   </div>
@@ -113,11 +187,11 @@ export function StaffPayslips() {
 
               <div className="flex justify-between rounded-lg bg-primary/10 p-4 text-lg font-bold">
                 <span>Net Pay</span>
-                <span className="font-mono">${Number(payslip.net_pay).toLocaleString()}</span>
+                <span className="font-mono">{formatCfa(payslip.net_pay)}</span>
               </div>
 
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Generated on: {new Date(payslip.created_at).toLocaleDateString()}</span>
+                <span>Generated on: {payslip.payment_date ? format(new Date(payslip.payment_date), "PPP") : format(new Date(payslip.created_at), "PPP")}</span>
                 <span>Payslip ID: {payslip.id}</span>
               </div>
             </CardContent>
@@ -125,5 +199,5 @@ export function StaffPayslips() {
         </Card>
       ))}
     </div>
-  )
+  );
 }

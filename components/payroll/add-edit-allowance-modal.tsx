@@ -26,7 +26,6 @@ interface AddEditAllowanceModalProps {
 export function AddEditAllowanceModal({ isOpen, onClose, allowance }: AddEditAllowanceModalProps) {
   const [formData, setFormData] = useState({
     name: "",
-    type: "fixed",
     amount: "",
     description: "",
   })
@@ -34,22 +33,53 @@ export function AddEditAllowanceModal({ isOpen, onClose, allowance }: AddEditAll
   useEffect(() => {
     if (allowance) {
       setFormData({
-        ...allowance,
+        name: allowance.name,
         amount: allowance.amount.toString(),
+        description: allowance.description || "",
       })
     } else {
-      setFormData({ name: "", type: "fixed", amount: "", description: "" })
+      setFormData({ name: "", amount: "", description: "" })
     }
   }, [allowance])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Allowance data:", formData)
-    onClose()
+
+    const method = allowance ? "PUT" : "POST"
+    const url = "/api/payroll/allowances"
+    const payload = {
+      name: formData.name,
+      amount: parseFloat(formData.amount),
+      description: formData.description,
+    }
+
+    if (allowance) {
+      // @ts-ignore
+      payload.id = allowance.id
+    }
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save allowance")
+      }
+
+      onClose()
+      // toast.success(allowance ? "Allowance updated successfully!" : "Allowance created successfully!")
+    } catch (error) {
+      console.error("Error saving allowance:", error)
+      alert("Failed to save allowance: " + (error as Error).message)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOncahnge={onClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{allowance ? "Edit Allowance" : "Add New Allowance"}</DialogTitle>
@@ -71,26 +101,13 @@ export function AddEditAllowanceModal({ isOpen, onClose, allowance }: AddEditAll
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
-            <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fixed">Fixed Amount</SelectItem>
-                <SelectItem value="percentage">Percentage</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="amount">{formData.type === "percentage" ? "Percentage (%)" : "Amount ($)"}</Label>
+            <Label htmlFor="amount">Amount ($)</Label>
             <Input
               id="amount"
               type="number"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              placeholder={formData.type === "percentage" ? "10" : "500"}
+              placeholder="500"
               required
             />
           </div>

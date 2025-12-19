@@ -3,13 +3,13 @@ import { redirect } from "next/navigation"
 
 export async function getCurrentUser() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data, error } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (error || !data || !data.user) {
     redirect("/login")
   }
+
+  const { user } = data
 
   // Get user profile with role
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
