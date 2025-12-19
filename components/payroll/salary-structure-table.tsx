@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { formatCfa } from "@/lib/utils/formatters"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Pencil } from "lucide-react"
@@ -37,7 +38,7 @@ export function SalaryStructureTable() {
                 <TableRow key={item.id}>
                   <TableCell>{item.staffType}</TableCell>
                   <TableCell className="font-medium">{item.position}</TableCell>
-                  <TableCell className="font-mono">${item.baseSalary.toLocaleString()}</TableCell>
+                  <TableCell className="font-mono">{formatCfa(item.baseSalary)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm">
                       <Pencil className="h-4 w-4" />

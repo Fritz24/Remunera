@@ -6,5 +6,10 @@ export function formatRelativeTime(dateString: string): string {
 }
 
 export function formatCfa(amount: number): string {
-  return new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XOF' }).format(amount);
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'XAF',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount).replace('XAF', 'FCFA').trim();
 }

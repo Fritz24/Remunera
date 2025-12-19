@@ -59,6 +59,8 @@ const fetcher = async ([url, month, year]: [string, string, string]) => {
 export function PayrollRunsContent() {
   const currentYear = new Date().getFullYear()
   const [selectedMonth, setSelectedMonth] = useState<string>((new Date().getMonth() + 1).toString())
+  const [selectedStatus, setSelectedStatus] = useState<string>("all")
+
   const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString())
 
   const { data: payrollRuns, error, isLoading, mutate } = useSWR<PayrollRun[]>(
@@ -110,14 +112,40 @@ export function PayrollRunsContent() {
     }
   }
 
+  const handleMarkAsPaid = async (runId: string) => {
+    try {
+      const response = await fetch("/api/payroll/runs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: runId, status: "paid" }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update status")
+      }
+
+      mutate() // Refresh data
+    } catch (error) {
+      console.error("Error marking as paid:", error)
+      alert("Failed to mark as paid")
+    }
+  }
+
   if (error) return <div>Failed to load payroll runs.</div>
+
+  const filteredPayrollRuns = payrollRuns?.filter(run => {
+    if (selectedStatus === "all") return true
+    if (selectedStatus === "paid") return run.status === "paid"
+    if (selectedStatus === "unpaid") return run.status !== "paid"
+    return true
+  })
+
+  // ... existing handlers ...
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Payroll Runs</h2>
-        <p className="text-muted-foreground">Process and manage payroll runs</p>
-      </div>
+      {/* ... header ... */}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -152,6 +180,16 @@ export function PayrollRunsContent() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-[180px]" suppressHydrationWarning>
+                <SelectValue placeholder="Filter by Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Table>
@@ -173,18 +211,18 @@ export function PayrollRunsContent() {
                     Loading payroll runs...
                   </TableCell>
                 </TableRow>
-              ) : payrollRuns?.length > 0 ? (
-                payrollRuns.map((run) => (
+              ) : filteredPayrollRuns?.length > 0 ? (
+                filteredPayrollRuns.map((run) => (
                   <TableRow key={run.id}>
                     <TableCell className="font-medium">
                       {`${new Date(0, run.month - 1).toLocaleString("en-US", { month: "long" })} ${run.year}`}
                     </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold
-                        ${run.status === "complete" ? "bg-green-100 text-green-800"
-                        : run.status === "approved" ? "bg-blue-100 text-blue-800"
-                        : run.status === "pending" ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"}`}>
+                        ${run.status === "paid" ? "bg-green-100 text-green-800"
+                          : run.status === "approved" ? "bg-blue-100 text-blue-800"
+                            : run.status === "processing" ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"}`}>
                         {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
                       </span>
                     </TableCell>
@@ -192,7 +230,23 @@ export function PayrollRunsContent() {
                     <TableCell className="text-red-600">-{formatCfa(run.total_deductions)}</TableCell>
                     <TableCell className="font-bold">{formatCfa(run.total_net)}</TableCell>
                     <TableCell>{run.processed_at ? format(new Date(run.processed_at), "MM/dd/yyyy") : "N/A"}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                      {run.status !== "paid" ? (
+                        <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(run.id)}>
+                          Mark Paid
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => {
+                          // Revert to approved
+                          fetch("/api/payroll/runs", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: run.id, status: "approved" }),
+                          }).then(() => mutate())
+                        }}>
+                          Mark Unpaid
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => handleViewDetails(run.id)}>
                         <Eye className="h-4 w-4" />
                       </Button>

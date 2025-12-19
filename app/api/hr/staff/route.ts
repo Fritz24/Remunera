@@ -11,7 +11,9 @@ export async function GET() {
       *,
       position:position_id(id, title),
       salary_structure(basic_salary),
-      staff_deduction(deduction(id, name))
+      staff_deduction(deduction(id, name)),
+      staff_allowance(allowance(id, name)),
+      profiles:user_id(role)
     `,
     )
     .order("created_at", { ascending: false })
@@ -27,9 +29,32 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const body = await request.json()
 
+  // Auto-generate staff_number if not provided
+  let staffNumber = body.staff_number
+  if (!staffNumber) {
+    // Get the highest staff number to avoid duplicates
+    const { data: existingStaff } = await supabase
+      .from("staff")
+      .select("staff_number")
+      .order("staff_number", { ascending: false })
+      .limit(1)
+
+    let nextNumber = 1
+    if (existingStaff && existingStaff.length > 0) {
+      // Extract number from format "EMP0001"
+      const lastNumber = existingStaff[0].staff_number
+      const match = lastNumber.match(/\d+/)
+      if (match) {
+        nextNumber = parseInt(match[0]) + 1
+      }
+    }
+
+    staffNumber = `EMP${String(nextNumber).padStart(4, "0")}`
+  }
+
   const { data: staffData, error: staffError } = await supabase.from("staff").insert({
     user_id: body.user_id,
-    staff_number: body.staff_number,
+    staff_number: staffNumber,
     first_name: body.first_name,
     middle_name: body.middle_name,
     last_name: body.last_name,
@@ -49,7 +74,7 @@ export async function POST(request: Request) {
     account_number: body.account_number,
     bank_code: body.bank_code,
     tax_id: body.tax_id,
-    hourly_rate: body.employment_status === "part-time" ? body.pay_per_hour : null,
+    hourly_rate: body.pay_per_hour !== undefined ? body.pay_per_hour : null,
   }).select().single()
 
   if (staffError) {
@@ -67,15 +92,59 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.deduction_id) {
-    const { error: staffDeductionError } = await supabase.from("staff_deduction").insert({
-      staff_id: staffData.id,
-      deduction_id: body.deduction_id,
-      amount: 0, // Default amount, can be updated later
-    })
-    if (staffDeductionError) {
-      return NextResponse.json({ error: staffDeductionError.message }, { status: 500 })
+  // Handle Allowances
+  if (body.allowance_ids && Array.isArray(body.allowance_ids)) {
+    // Delete existing
+    await supabase.from("staff_allowance").delete().eq("staff_id", staffData.id)
+
+    if (body.allowance_ids.length > 0) {
+      // Fetch default amounts
+      const { data: allowances } = await supabase
+        .from("allowance")
+        .select("id, amount")
+        .in("id", body.allowance_ids)
+
+      if (allowances) {
+        const allowanceInserts = allowances.map(a => ({
+          staff_id: staffData.id,
+          allowance_id: a.id,
+          amount: a.amount || 0
+        }))
+
+        const { error: insertError } = await supabase.from("staff_allowance").insert(allowanceInserts)
+        if (insertError) console.error("Error inserting allowances:", insertError)
+      }
     }
+  }
+
+  // Handle Deductions
+  if (body.deduction_ids && Array.isArray(body.deduction_ids)) {
+    // Delete existing
+    await supabase.from("staff_deduction").delete().eq("staff_id", staffData.id)
+
+    if (body.deduction_ids.length > 0) {
+      // Fetch default amounts
+      const { data: deductions } = await supabase
+        .from("deduction")
+        .select("id, amount")
+        .in("id", body.deduction_ids)
+
+      if (deductions) {
+        const deductionInserts = deductions.map(d => ({
+          staff_id: staffData.id,
+          deduction_id: d.id,
+          amount: d.amount || 0
+        }))
+
+        const { error: insertError } = await supabase.from("staff_deduction").insert(deductionInserts)
+        if (insertError) console.error("Error inserting deductions:", insertError)
+      }
+    }
+  } else if (body.deduction_id) {
+    // Legacy support for single deduction_id (if needed, or just migrate UI)
+    // We will migrate UI to use deduction_ids array, so this block might be redundant 
+    // but kept for backward compatibility if UI isn't fully updated yet.
+    // Actually, let's assume we update UI to send arrays.
   }
 
   return NextResponse.json(staffData)
@@ -113,75 +182,65 @@ export async function PUT(request: Request) {
   }
 
   if (body.employment_status === "full-time" && body.salary) {
-    const { data: existingSalary, error: fetchError } = await supabase
+    const { data: existingSalary } = await supabase
       .from("salary_structure")
       .select("id")
       .eq("staff_id", body.id)
       .single()
 
-    if (fetchError && fetchError.code !== "PGRST116") { // PGRST116 means no rows found
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
-    }
-
     if (existingSalary) {
-      const { error: updateSalaryError } = await supabase.from("salary_structure").update({
+      await supabase.from("salary_structure").update({
         basic_salary: body.salary,
         effective_date: body.hire_date,
       }).eq("staff_id", body.id)
-
-      if (updateSalaryError) {
-        return NextResponse.json({ error: updateSalaryError.message }, { status: 500 })
-      }
     } else {
-      const { error: insertSalaryError } = await supabase.from("salary_structure").insert({
+      await supabase.from("salary_structure").insert({
         staff_id: body.id,
         basic_salary: body.salary,
         effective_date: body.hire_date,
       })
-      if (insertSalaryError) {
-        return NextResponse.json({ error: insertSalaryError.message }, { status: 500 })
+    }
+  }
+
+  // Handle Allowances (Same logic as POST)
+  if (body.allowance_ids && Array.isArray(body.allowance_ids)) {
+    await supabase.from("staff_allowance").delete().eq("staff_id", body.id)
+
+    if (body.allowance_ids.length > 0) {
+      const { data: allowances } = await supabase
+        .from("allowance")
+        .select("id, amount")
+        .in("id", body.allowance_ids)
+
+      if (allowances) {
+        const allowanceInserts = allowances.map(a => ({
+          staff_id: body.id,
+          allowance_id: a.id,
+          amount: a.amount || 0
+        }))
+        await supabase.from("staff_allowance").insert(allowanceInserts)
       }
     }
   }
 
-  // Handle deductions for existing staff
-  if (body.deduction_id) {
-    // First, check if a staff_deduction entry already exists for this staff member
-    const { data: existingDeduction, error: fetchDeductionError } = await supabase
-      .from("staff_deduction")
-      .select("id")
-      .eq("staff_id", body.id)
-      .single()
+  // Handle Deductions (Same logic as POST)
+  if (body.deduction_ids && Array.isArray(body.deduction_ids)) {
+    await supabase.from("staff_deduction").delete().eq("staff_id", body.id)
 
-    if (fetchDeductionError && fetchDeductionError.code !== "PGRST116") {
-      return NextResponse.json({ error: fetchDeductionError.message }, { status: 500 })
-    }
+    if (body.deduction_ids.length > 0) {
+      const { data: deductions } = await supabase
+        .from("deduction")
+        .select("id, amount")
+        .in("id", body.deduction_ids)
 
-    if (existingDeduction) {
-      // If exists, update it
-      const { error: updateDeductionError } = await supabase.from("staff_deduction").update({
-        deduction_id: body.deduction_id,
-      }).eq("staff_id", body.id)
-
-      if (updateDeductionError) {
-        return NextResponse.json({ error: updateDeductionError.message }, { status: 500 })
+      if (deductions) {
+        const deductionInserts = deductions.map(d => ({
+          staff_id: body.id,
+          deduction_id: d.id,
+          amount: d.amount || 0
+        }))
+        await supabase.from("staff_deduction").insert(deductionInserts)
       }
-    } else {
-      // If not exists, insert new
-      const { error: insertDeductionError } = await supabase.from("staff_deduction").insert({
-        staff_id: body.id,
-        deduction_id: body.deduction_id,
-        amount: 0, // Default amount, can be updated later
-      })
-      if (insertDeductionError) {
-        return NextResponse.json({ error: insertDeductionError.message }, { status: 500 })
-      }
-    }
-  } else {
-    // If no deduction_id is provided, delete any existing staff_deduction for this staff member
-    const { error: deleteDeductionError } = await supabase.from("staff_deduction").delete().eq("staff_id", body.id)
-    if (deleteDeductionError && deleteDeductionError.code !== "PGRST116") {
-      return NextResponse.json({ error: deleteDeductionError.message }, { status: 500 })
     }
   }
 

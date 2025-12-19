@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { formatCfa } from "@/lib/utils/formatters"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -91,9 +92,9 @@ export function PayrollRunsTable() {
                         {run.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono">${run.totalGross.toLocaleString()}</TableCell>
-                    <TableCell className="font-mono text-red-600">-${run.totalDeductions.toLocaleString()}</TableCell>
-                    <TableCell className="font-mono font-bold">${run.totalNet.toLocaleString()}</TableCell>
+                    <TableCell className="font-mono">{formatCfa(run.totalGross)}</TableCell>
+                    <TableCell className="font-mono text-red-600">-{formatCfa(run.totalDeductions)}</TableCell>
+                    <TableCell className="font-mono font-bold">{formatCfa(run.totalNet)}</TableCell>
                     <TableCell>{new Date(run.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm">

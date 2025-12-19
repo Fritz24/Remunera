@@ -61,19 +61,12 @@ export function StaffPayslips() {
   };
 
   const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      paid: "bg-green-100 text-green-800",
-      pending: "bg-yellow-100 text-yellow-800",
-      approved: "bg-blue-100 text-blue-800",
-      cancelled: "bg-gray-100 text-gray-800",
-    };
-    return colors[status] || colors.pending;
+    if (status === "paid") return "bg-green-100 text-green-800 hover:bg-green-100"
+    return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
   };
 
   const handleDownloadPayslip = (payslipId: string) => {
-    console.log("Download payslip:", payslipId);
-    // Implement actual download logic, e.g., fetch from a backend endpoint
-    // For now, it's a placeholder.
+    window.open(`/admin/payslips/${payslipId}/print`, "_blank")
   };
 
   if (error) return <div className="text-center text-destructive">Failed to load payslips</div>;
@@ -90,7 +83,7 @@ export function StaffPayslips() {
     <div className="space-y-4">
       <div className="flex items-center gap-4 mb-4 flex-wrap">
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px]" suppressHydrationWarning>
             <SelectValue placeholder="Select Month" />
           </SelectTrigger>
           <SelectContent>
@@ -102,7 +95,7 @@ export function StaffPayslips() {
           </SelectContent>
         </Select>
         <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px]" suppressHydrationWarning>
             <SelectValue placeholder="Select Year" />
           </SelectTrigger>
           <SelectContent>
@@ -124,7 +117,7 @@ export function StaffPayslips() {
                   {format(new Date(payslip.year, payslip.month - 1), "MMMM yyyy")}
                 </CardTitle>
                 <Badge variant="secondary" className={getStatusBadge(payslip.status)}>
-                  {payslip.status}
+                  {payslip.status === "paid" ? "Paid" : "Unpaid"}
                 </Badge>
               </div>
               <div className="flex gap-2">

@@ -35,7 +35,7 @@ export default function PayrollDashboard() {
         .order('processed_at', { ascending: false })
         .limit(1)
         .single();
-      
+
       if (runError && runError.code !== 'PGRST116') {
         console.error("Error fetching latest payroll run:", runError)
         throw runError;
@@ -88,7 +88,7 @@ export default function PayrollDashboard() {
         .select('net_pay')
         .eq('month', currentMonth)
         .eq('year', currentYear);
-      
+
       if (avgSalaryError) {
         console.error("Error fetching avg salary data:", avgSalaryError)
         throw avgSalaryError;
@@ -105,14 +105,14 @@ export default function PayrollDashboard() {
         .select('net_pay')
         .eq('month', previousMonth)
         .eq('year', previousYear);
-      
+
       if (prevAvgSalaryError) {
         console.error("Error fetching previous month avg salary data:", prevAvgSalaryError)
       }
       const totalPrevNetPays = prevAvgSalaryData?.reduce((sum, payslip) => sum + payslip.net_pay, 0) || 0;
       const prevPayslipsGenerated = prevAvgSalaryData?.length || 0;
       const prevAvgSalary = prevPayslipsGenerated > 0 ? totalPrevNetPays / prevPayslipsGenerated : 0;
-      
+
       const avgSalaryChange = prevAvgSalary > 0 ? ((avgSalary - prevAvgSalary) / prevAvgSalary) * 100 : 0;
 
       return {
@@ -200,7 +200,7 @@ export default function PayrollDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Staff Unpaid</CardTitle>
-              <UserX className="h-4 w-4 text-red-500" /> 
+              <UserX className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
@@ -307,7 +307,7 @@ export default function PayrollDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Link href="/payroll/salary?tab=part-time" className="block"> 
+                <Link href="/payroll/salary?tab=part-time" className="block">
                   <div className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted">
                     <FileText className="h-5 w-5 text-primary" />
                     <div>

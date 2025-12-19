@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { formatCfa } from "@/lib/utils/formatters"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,7 +68,7 @@ export function AllowancesTable() {
                   <TableRow key={allowance.id}>
                     <TableCell className="font-medium">{allowance.name}</TableCell>
                     <TableCell className="font-mono">
-                      {`$${Number(allowance.amount).toLocaleString()}`}
+                      {formatCfa(Number(allowance.amount))}
                     </TableCell>
                     <TableCell>{allowance.description}</TableCell>
                     <TableCell className="text-right">

@@ -64,21 +64,82 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Create payroll run
-  const { data: payrollRun, error: runError } = await supabase
+  // Check for existing payroll run
+  let { data: payrollRun, error: fetchError } = await supabase
     .from("payroll_run")
-    .insert({
-      month,
-      year,
-      status: "processing",
-      processed_by: user?.id,
-      processed_at: new Date().toISOString(),
-    })
-    .select()
+    .select("id, status")
+    .eq("month", month)
+    .eq("year", year)
     .single()
 
-  if (runError) {
-    return NextResponse.json({ error: runError.message }, { status: 500 })
+  if (fetchError && fetchError.code !== "PGRST116") {
+    return NextResponse.json({ error: fetchError.message }, { status: 500 })
+  }
+
+  if (payrollRun) {
+    if (payrollRun.status === "paid") {
+      return NextResponse.json({ error: "Payroll for this period has already been paid." }, { status: 400 })
+    }
+
+    // If not paid, we can re-run it. First, clean up existing payslips.
+    // 1. Get payslip IDs
+    const { data: existingPayslips } = await supabase
+      .from("payslip")
+      .select("id")
+      .eq("payroll_run_id", payrollRun.id)
+
+    if (existingPayslips && existingPayslips.length > 0) {
+      const payslipIds = existingPayslips.map(p => p.id)
+
+      // 2. Delete payslip details
+      const { error: deleteDetailsError } = await supabase
+        .from("payslip_details")
+        .delete()
+        .in("payslip_id", payslipIds)
+
+      if (deleteDetailsError) {
+        return NextResponse.json({ error: "Failed to clear existing payslip details: " + deleteDetailsError.message }, { status: 500 })
+      }
+
+      // 3. Delete payslips
+      const { error: deletePayslipsError } = await supabase
+        .from("payslip")
+        .delete()
+        .eq("payroll_run_id", payrollRun.id)
+
+      if (deletePayslipsError) {
+        return NextResponse.json({ error: "Failed to clear existing payslips: " + deletePayslipsError.message }, { status: 500 })
+      }
+    }
+
+    // Update status to processing
+    await supabase
+      .from("payroll_run")
+      .update({
+        status: "processing",
+        processed_by: user?.id,
+        processed_at: new Date().toISOString()
+      })
+      .eq("id", payrollRun.id)
+
+  } else {
+    // Create new payroll run
+    const { data: newRun, error: runError } = await supabase
+      .from("payroll_run")
+      .insert({
+        month,
+        year,
+        status: "processing",
+        processed_by: user?.id,
+        processed_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (runError) {
+      return NextResponse.json({ error: runError.message }, { status: 500 })
+    }
+    payrollRun = newRun
   }
 
   // Get all active staff with salary structures
@@ -151,4 +212,54 @@ export async function POST(request: Request) {
     .eq("id", payrollRun.id)
 
   return NextResponse.json({ success: true, payrollRun, payslipsGenerated: payslips.length })
+}
+
+export async function PATCH(request: Request) {
+  const supabase = await createClient()
+  const body = await request.json()
+  const { id, status } = body
+
+  if (!id || !status) {
+    return NextResponse.json({ error: "ID and status are required" }, { status: 400 })
+  }
+
+  // Update payroll run status
+  const { error } = await supabase
+    .from("payroll_run")
+    .update({ status })
+    .eq("id", id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // If status is 'paid', update all linked payslips to 'paid'
+  if (status === "paid") {
+    const { error: payslipError } = await supabase
+      .from("payslip")
+      .update({
+        status: "paid",
+        payment_date: new Date().toISOString()
+      })
+      .eq("payroll_run_id", id)
+
+    if (payslipError) {
+      console.error("Error updating payslips to paid:", payslipError)
+    }
+  } else if (status === "approved") {
+    // If reverting to approved (unmarking as paid), reset payslips to pending
+    const { error: payslipError } = await supabase
+      .from("payslip")
+      .update({
+        status: "pending",
+        payment_date: null
+      })
+      .eq("payroll_run_id", id)
+
+    if (payslipError) {
+      console.error("Error reverting payslips to pending:", payslipError)
+    }
+  }
+
+  return NextResponse.json({ success: true })
 }

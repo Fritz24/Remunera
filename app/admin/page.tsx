@@ -25,25 +25,35 @@ export default function AdminDashboard() {
     async (url) => {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error("Failed to fetch recent activities");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to fetch recent activities");
       }
       return response.json();
     }
   );
 
   if (usersCountError || activitiesError) {
-    return <DashboardLayout role="admin" userName="Admin"><div>Error loading dashboard data.</div></DashboardLayout>
+    console.error("Dashboard Error:", { usersCountError, activitiesError })
+    return (
+      <DashboardLayout role="admin" userName="Admin">
+        <div className="p-4 text-red-500">
+          <h3 className="font-bold">Error loading dashboard data:</h3>
+          <p>Users Count Error: {usersCountError?.message || "None"}</p>
+          <p>Activities Error: {activitiesError?.message || "None"}</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
-    <DashboardLayout role="admin" userName="Admin"> 
+    <DashboardLayout role="admin" userName="Admin">
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
           <p className="text-muted-foreground">Manage users and system settings</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2"> 
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">System Users</CardTitle>
@@ -66,7 +76,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2"> 
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Recent Activity</CardTitle>

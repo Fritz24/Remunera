@@ -41,7 +41,7 @@ export function DashboardNavbar({ userName }: DashboardNavbarProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2" suppressHydrationWarning>
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">{userName}</span>
             </Button>

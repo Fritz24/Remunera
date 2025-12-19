@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { formatCfa } from "@/lib/utils/formatters"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,7 +68,7 @@ export function DeductionsTable() {
                   <TableRow key={deduction.id}>
                     <TableCell className="font-medium">{deduction.name}</TableCell>
                     <TableCell className="font-mono">
-                      {`$${Number(deduction.amount).toLocaleString()}`}
+                      {formatCfa(Number(deduction.amount))}
                     </TableCell>
                     <TableCell>{deduction.description}</TableCell>
                     <TableCell className="text-right">

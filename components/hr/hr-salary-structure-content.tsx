@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState } from "react"
 import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { formatCfa } from "@/lib/utils/formatters"
 
 interface FullTimeSalaryData {
   id: string;
@@ -150,11 +152,13 @@ export function HrSalaryStructureContent() {
                       <TableRow key={staff.id}>
                         <TableCell className="font-medium">{staff.name}</TableCell>
                         <TableCell>{staff.position}</TableCell>
-                        <TableCell>${staff.basic_salary.toLocaleString()}</TableCell>
+                        <TableCell>{formatCfa(staff.basic_salary)}</TableCell>
                         <TableCell>{staff.allowances}</TableCell>
                         <TableCell>{staff.deductions}</TableCell>
-                        <TableCell className="font-bold">${staff.net_pay.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{/* Actions */}</TableCell>
+                        <TableCell className="font-bold">{formatCfa(staff.net_pay)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm">Edit</Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (

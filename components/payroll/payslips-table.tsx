@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { formatCfa } from "@/lib/utils/formatters"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -90,9 +91,9 @@ export function PayslipsTable() {
                 <TableRow key={payslip.id}>
                   <TableCell className="font-medium">{payslip.staffName}</TableCell>
                   <TableCell>{payslip.period}</TableCell>
-                  <TableCell className="font-mono">${payslip.basicSalary.toLocaleString()}</TableCell>
-                  <TableCell className="font-mono">${payslip.grossPay.toLocaleString()}</TableCell>
-                  <TableCell className="font-mono font-bold">${payslip.netPay.toLocaleString()}</TableCell>
+                  <TableCell className="font-mono">{formatCfa(payslip.basicSalary)}</TableCell>
+                  <TableCell className="font-mono">{formatCfa(payslip.grossPay)}</TableCell>
+                  <TableCell className="font-mono font-bold">{formatCfa(payslip.netPay)}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getStatusBadge(payslip.status)}>
                       {payslip.status}

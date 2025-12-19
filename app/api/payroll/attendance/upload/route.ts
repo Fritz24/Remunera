@@ -167,7 +167,7 @@ export async function POST(request: Request) {
         .eq("month", parsedMonth)
         .eq("year", parsedYear)
         .single()
-      
+
       if (fetchAttendanceError && fetchAttendanceError.code !== 'PGRST116') {
         console.error(`Error fetching existing attendance for ${staffData.first_name}:`, fetchAttendanceError)
         throw new Error(fetchAttendanceError.message)
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingAttendance.id)
-        
+
         if (updateAttendanceError) {
           console.error(`Error updating attendance for ${staffData.first_name}:`, updateAttendanceError)
           throw new Error(updateAttendanceError.message)

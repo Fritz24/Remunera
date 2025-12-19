@@ -51,7 +51,7 @@ const fetcher = async ([url, status, month, year]: [string, string, string, stri
       )
       `
     )
-  
+
   if (status && status !== "all") {
     query = query.eq("status", status)
   }
@@ -113,10 +113,8 @@ export function PayslipsContent() {
 
   const statuses = [
     { value: "all", label: "All Statuses" },
-    { value: "pending", label: "Pending" },
     { value: "paid", label: "Paid" },
-    { value: "cancelled", label: "Cancelled" },
-    { value: "approved", label: "Approved" },
+    { value: "unpaid", label: "Unpaid" },
   ]
 
   const filteredPayslips = payslips?.filter((payslip) =>
@@ -132,9 +130,7 @@ export function PayslipsContent() {
   }
 
   const handleDownloadPayslip = (payslipId: string) => {
-    // Placeholder for downloading payslip - e.g., trigger a backend download endpoint
-    console.log("Download payslip:", payslipId)
-    // In a real application, you might call a backend endpoint like /api/payroll/payslips/download?id=payslipId
+    window.open(`/admin/payslips/${payslipId}/print`, "_blank")
   }
 
   if (error) return <div>Failed to load payslips</div>
@@ -159,7 +155,7 @@ export function PayslipsContent() {
               className="max-w-sm"
             />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" suppressHydrationWarning>
                 <SelectValue placeholder="Filter by Status" />
               </SelectTrigger>
               <SelectContent>
@@ -171,7 +167,7 @@ export function PayslipsContent() {
               </SelectContent>
             </Select>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" suppressHydrationWarning>
                 <SelectValue placeholder="Select Month" />
               </SelectTrigger>
               <SelectContent>
@@ -183,7 +179,7 @@ export function PayslipsContent() {
               </SelectContent>
             </Select>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" suppressHydrationWarning>
                 <SelectValue placeholder="Select Year" />
               </SelectTrigger>
               <SelectContent>
@@ -230,10 +226,8 @@ export function PayslipsContent() {
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold
                         ${payslip.status === "paid" ? "bg-green-100 text-green-800"
-                        : payslip.status === "approved" ? "bg-blue-100 text-blue-800"
-                        : payslip.status === "pending" ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"}`}>
-                        {payslip.status.charAt(0).toUpperCase() + payslip.status.slice(1)}
+                          : "bg-yellow-100 text-yellow-800"}`}>
+                        {payslip.status === "paid" ? "Paid" : "Unpaid"}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">

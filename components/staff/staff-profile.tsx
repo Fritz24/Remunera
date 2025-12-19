@@ -18,10 +18,9 @@ interface StaffProfileData {
   first_name: string
   last_name: string
   email: string
-  phone_number: string
+  phone: string
   employment_status: string
   position: { title: string }
-  employment_type: string
   hire_date: string
   salary_structure: { basic_salary: number }[]
   staff_allowance: { allowance: { name: string; amount: number } }[]
@@ -54,10 +53,9 @@ export function StaffProfile() {
           first_name,
           last_name,
           email,
-          phone_number,
+          phone,
           employment_status,
           position(title),
-          employment_type,
           hire_date,
           salary_structure(basic_salary),
           staff_allowance(allowance(name, amount)),
@@ -168,7 +166,7 @@ export function StaffProfile() {
               <Phone className="h-5 w-5 text-muted-foreground" />
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Phone</p>
-                <p className="text-sm font-medium">{staffProfile.phone_number || "N/A"}</p>
+                <p className="text-sm font-medium">{staffProfile.phone || "N/A"}</p>
               </div>
             </div>
           </div>
@@ -190,16 +188,20 @@ export function StaffProfile() {
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Employment Type</p>
+              <p className="text-sm text-muted-foreground">Employment Status</p>
               <Badge
                 variant="secondary"
                 className={
-                  staffProfile.employment_type === "full-time"
+                  staffProfile.employment_status === "active"
                     ? "bg-green-100 text-green-800"
-                    : "bg-blue-100 text-blue-800"
+                    : staffProfile.employment_status === "inactive"
+                      ? "bg-gray-100 text-gray-800"
+                      : staffProfile.employment_status === "terminated"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-blue-100 text-blue-800"
                 }
               >
-                {staffProfile.employment_type}
+                {staffProfile.employment_status}
               </Badge>
             </div>
           </div>
@@ -220,7 +222,7 @@ export function StaffProfile() {
               </div>
             </div>
           </div>
-          
+
           {staffProfile.staff_allowance && staffProfile.staff_allowance.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Allowances</p>
@@ -246,7 +248,7 @@ export function StaffProfile() {
               </div>
             </div>
           )}
-          
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Net Salary</p>

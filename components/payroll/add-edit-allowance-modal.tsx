@@ -79,7 +79,7 @@ export function AddEditAllowanceModal({ isOpen, onClose, allowance }: AddEditAll
   }
 
   return (
-    <Dialog open={isOpen} onOncahnge={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{allowance ? "Edit Allowance" : "Add New Allowance"}</DialogTitle>
@@ -101,7 +101,7 @@ export function AddEditAllowanceModal({ isOpen, onClose, allowance }: AddEditAll
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount ($)</Label>
+            <Label htmlFor="amount">Amount (FCFA)</Label>
             <Input
               id="amount"
               type="number"

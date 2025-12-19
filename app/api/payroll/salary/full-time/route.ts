@@ -21,7 +21,8 @@ export async function GET(request: Request) {
       staff_deduction(amount, deduction(name))
       `
     )
-    .eq("employment_status", "full-time")
+    .is("hourly_rate", null)
+    .eq("employment_status", "active")
 
   // Optional: Filter by active salary structure for the given period if needed
   // Note: This logic might need refinement based on how you define 'active' salary for a past period.
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
 
   const processedStaffData = staffData.map((staff) => {
     const basicSalaryEntry = staff.salary_structure?.find(
-      (ss: any) => ss.is_active && new Date(ss.effective_date).getFullYear() <= parseInt(year || new Date().getFullYear().toString())
+      (ss: any) => ss.is_active // Simplified: just take the active one. Or sort by date if multiple.
     )
     const basic_salary = basicSalaryEntry?.basic_salary || 0
 
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     return {
       id: staff.id,
       name: `${staff.first_name} ${staff.last_name}`,
-      position: staff.position?.title || "N/A",
+      position: Array.isArray(staff.position) ? (staff.position[0] as any)?.title : (staff.position as any)?.title || "N/A",
       basic_salary: basic_salary,
       allowances: allowanceNames.join(", ") || "None",
       total_allowances: totalAllowances,

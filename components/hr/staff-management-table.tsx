@@ -62,11 +62,20 @@ export function StaffManagementTable() {
       inactive: "bg-gray-100 text-gray-800",
       terminated: "bg-red-100 text-red-800",
       on_leave: "bg-blue-100 text-blue-800",
-      // Add colors for full-time and part-time if needed
       "full-time": "bg-purple-100 text-purple-800",
       "part-time": "bg-yellow-100 text-yellow-800",
     }
     return colors[status] || colors.active
+  }
+
+  const getRoleBadge = (role: string) => {
+    const colors: Record<string, string> = {
+      admin: "bg-red-100 text-red-800",
+      hr: "bg-blue-100 text-blue-800",
+      payroll: "bg-green-100 text-green-800",
+      staff: "bg-gray-100 text-gray-800",
+    }
+    return colors[role] || colors.staff
   }
 
   const filteredStaff = staffList.filter(
@@ -85,10 +94,10 @@ export function StaffManagementTable() {
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Staff Members</CardTitle>
+            <CardTitle>Employees</CardTitle>
             <Button onClick={handleAddStaff}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Staff
+              Add Employee
             </Button>
           </div>
         </CardHeader>
@@ -110,6 +119,7 @@ export function StaffManagementTable() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead>Position</TableHead>
                   <TableHead>Employment Type</TableHead>
                   <TableHead>Email</TableHead>
@@ -129,6 +139,11 @@ export function StaffManagementTable() {
                         </p>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={getRoleBadge(staff.profiles?.role || "staff")}>
+                        {(staff.profiles?.role || "staff").toUpperCase()}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{staff.position?.title || "N/A"}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={getEmploymentTypeBadge(staff.employment_status)}>
@@ -139,8 +154,8 @@ export function StaffManagementTable() {
                     <TableCell>{staff.phone || "N/A"}</TableCell>
                     <TableCell>{staff.hire_date || "N/A"}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={getEmploymentTypeBadge(staff.status)}>
-                        {staff.status}
+                      <Badge variant="secondary" className={getEmploymentTypeBadge(staff.employment_status)}>
+                        {staff.employment_status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

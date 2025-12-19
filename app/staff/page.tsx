@@ -15,12 +15,10 @@ interface StaffData {
   id: string
   first_name: string
   last_name: string
-  employment_type: string
   employment_status: string
   hire_date: string
   salary_structure: { basic_salary: number }[]
-  staff_type: { name: string }
-  // Add any other fields you need
+  position: { title: string }
 }
 
 interface PayslipData {
@@ -73,10 +71,9 @@ export default function StaffDashboard() {
           id,
           first_name,
           last_name,
-          employment_type,
           employment_status,
           hire_date,
-          salary_structure!inner(basic_salary),
+          salary_structure(basic_salary),
           position(title)
         `,
         )
@@ -170,7 +167,7 @@ export default function StaffDashboard() {
               <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{staffLoading ? 'Loading...' : staffData?.employment_type || "N/A"}</div>
+              <div className="text-2xl font-bold">{staffLoading ? 'Loading...' : staffData?.position?.title || "N/A"}</div>
               <p className="text-xs text-muted-foreground">{staffLoading ? 'Loading...' : staffData?.employment_status || "Status"}</p>
             </CardContent>
           </Card>
@@ -271,7 +268,7 @@ export default function StaffDashboard() {
               )}
             </CardContent>
           </Card>
-          
+
           {/* Placeholder for Recent Changes */}
           <Card className="lg:col-span-3"> {/* Takes full width on large screens */}
             <CardHeader>
