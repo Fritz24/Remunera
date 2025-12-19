@@ -68,42 +68,51 @@ export async function POST(request: Request) {
     }
 
     const processedData = []
-    const payslipsToInsert = []
     const payslipDetailsToInsert = []
     let overallGrossPay = payrollRun.total_gross || 0
     let overallDeductions = payrollRun.total_deductions || 0
     let overallNetSalary = payrollRun.total_net || 0
 
     for (const record of records) {
+      const staffNumber = record["Staff Number"]
       const staffName = record.Name
       const positionTitle = record.Position
       const hoursPresent = parseFloat(record["Hours Present"])
       const hoursAbsent = parseFloat(record["Hours Absent"])
       const overtimeHours = parseFloat(record.Overtime)
 
-      const { data: staffData, error: staffError } = await supabase
+      let query = supabase
         .from("staff")
         .select(
           `
           id,
+          staff_number,
           first_name,
           last_name,
           hourly_rate,
+          employment_status,
           position(title),
           staff_deduction(amount, deduction(id, name, amount)),
-          staff_allowance(amount, allowance(id, name, amount))
+          staff_allowance(amount, allowance(id, name, amount)),
+          salary_structure(basic_salary)
           `
         )
-        .ilike("first_name", `%${staffName.split(' ')[0]}%`)
-        .ilike("last_name", `%${staffName.split(' ')[1]}%`)
-        .limit(1)
-        .single()
+
+      if (staffNumber) {
+        query = query.eq("staff_number", staffNumber)
+      } else {
+        query = query
+          .ilike("first_name", `%${staffName.split(' ')[0]}%`)
+          .ilike("last_name", `%${staffName.split(' ')[1]}%`)
+      }
+
+      const { data: staffData, error: staffError } = await query.limit(1).maybeSingle()
 
       if (staffError || !staffData) {
-        console.error(`Error fetching staff data for ${staffName}:`, staffError?.message || "Staff not found")
+        console.error(`Error fetching staff data for ${staffName || staffNumber}:`, staffError?.message || "Staff not found")
         processedData.push({
-          Name: staffName,
-          Position: positionTitle,
+          Name: staffName || "Unknown",
+          Position: positionTitle || "Unknown",
           "Hours Present": hoursPresent,
           "Hours Absent": hoursAbsent,
           Overtime: overtimeHours,
@@ -116,8 +125,19 @@ export async function POST(request: Request) {
       }
 
       // Calculate gross pay
-      const hourlyRate = staffData.hourly_rate || 0
-      const grossPay = (hoursPresent * hourlyRate) + (overtimeHours * hourlyRate * 1.5) // Assuming 1.5x for overtime
+      let basicSalary = 0
+      let grossPay = 0
+
+      if (staffData.employment_status === "full-time") {
+        basicSalary = staffData.salary_structure?.[0]?.basic_salary || 0
+        // For full-time, we might still track hours but pay is based on basic salary
+        // Or we might calculate based on hours if that's the policy. 
+        // Assuming basic salary is the base for full-time.
+        grossPay = basicSalary
+      } else {
+        const hourlyRate = staffData.hourly_rate || 0
+        grossPay = (hoursPresent * hourlyRate) + (overtimeHours * hourlyRate * 1.5)
+      }
 
       // Calculate total deductions for this staff member
       let totalDeductionsForStaff = 0
@@ -128,7 +148,7 @@ export async function POST(request: Request) {
         for (const sd of staffData.staff_deduction) {
           if (sd.deduction) {
             totalDeductionsForStaff += sd.deduction.amount || 0
-            deductionNames.push(`${sd.deduction.name} ($${sd.deduction.amount})`)
+            deductionNames.push(`${sd.deduction.name} (FCFA ${sd.deduction.amount})`)
             currentDeductionDetails.push({
               type: "deduction",
               name: sd.deduction.name,
@@ -138,7 +158,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // Calculate total allowances for this staff member (part-time might have fewer allowances, but structure is similar)
+      // Calculate total allowances for this staff member
       let totalAllowancesForStaff = 0
       const allowanceNames: string[] = []
       const currentAllowanceDetails = []
@@ -147,7 +167,7 @@ export async function POST(request: Request) {
         for (const sa of staffData.staff_allowance) {
           if (sa.allowance) {
             totalAllowancesForStaff += sa.amount || 0
-            allowanceNames.push(`${sa.allowance.name} ($${sa.amount})`)
+            allowanceNames.push(`${sa.allowance.name} (FCFA ${sa.amount})`)
             currentAllowanceDetails.push({
               type: "allowance",
               name: sa.allowance.name,
@@ -166,9 +186,9 @@ export async function POST(request: Request) {
         .eq("staff_id", staffData.id)
         .eq("month", parsedMonth)
         .eq("year", parsedYear)
-        .single()
+        .maybeSingle()
 
-      if (fetchAttendanceError && fetchAttendanceError.code !== 'PGRST116') {
+      if (fetchAttendanceError) {
         console.error(`Error fetching existing attendance for ${staffData.first_name}:`, fetchAttendanceError)
         throw new Error(fetchAttendanceError.message)
       }
@@ -214,13 +234,13 @@ export async function POST(request: Request) {
           staff_id: staffData.id,
           month: parsedMonth,
           year: parsedYear,
-          basic_salary: 0, // Part-time staff, basic_salary is 0 or null
+          basic_salary: basicSalary,
           total_allowances: totalAllowancesForStaff,
           total_deductions: totalDeductionsForStaff,
-          gross_pay: grossPay + totalAllowancesForStaff, // Gross includes allowances for payslip table
+          gross_pay: grossPay + totalAllowancesForStaff,
           net_pay: netPay,
-          status: "pending", // Initial status
-          payment_date: null, // To be set when paid
+          status: "pending",
+          payment_date: null,
         })
         .select("id")
         .single()
@@ -281,7 +301,7 @@ export async function POST(request: Request) {
         total_gross: overallGrossPay,
         total_deductions: overallDeductions,
         total_net: overallNetSalary,
-        status: "approved", // Mark as approved after processing all staff
+        status: "approved",
       })
       .eq("id", payrollRun.id)
 

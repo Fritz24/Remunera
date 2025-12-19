@@ -78,7 +78,7 @@ export function AttendanceCsvUpload({ onUploadSuccess, month, year }: Attendance
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Expected CSV format: <code className="font-mono text-xs">Name,Position,Hours Present,Hours Absent,Overtime</code>
+        Expected CSV format: <code className="font-mono text-xs">Staff Number,Name,Position,Hours Present,Hours Absent,Overtime</code>
       </p>
       <p className="text-xs text-muted-foreground">
         Ensure 'Name' matches staff's first and last names in the system.
